@@ -5,9 +5,11 @@ import CategoryRow from "@/components/CategoryRow";
 import Footer from "@/components/Footer";
 import Loader from "@/components/Loader";
 import { useMovies } from "@/hooks/useMovies";
+import { useAuth } from "@/context/AuthContext";
 
 const Index = () => {
   const { data: movies = [], isLoading } = useMovies();
+  const { preferences } = useAuth();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -23,7 +25,18 @@ const Index = () => {
   }
 
   const featured = movies.filter((m) => m.isFeatured);
-  const recent = [...movies].sort((a, b) => b.releaseYear - a.releaseYear).slice(0, 10);
+  const recent = [...movies].sort((a, b) => (b.release_date || "").localeCompare(a.release_date || "")).slice(0, 10);
+
+  // Continue Watching Logic
+  const continueWatching = preferences.history
+    .map(h => {
+      const movie = movies.find(m => m.id === h.movieId);
+      if (!movie) return null;
+      // Filter out completed ones (e.g. > 95%)
+      if (h.duration > 0 && h.progress / h.duration > 0.95) return null;
+      return { ...movie, playbackProgress: h.progress, playbackDuration: h.duration };
+    })
+    .filter(Boolean) as any[];
 
   // Dynamic categorization: matches either category field or genres array
   const actionMovies = movies.filter((m) => m.category === "Action" || (m.genres || []).includes("Action"));
@@ -39,13 +52,14 @@ const Index = () => {
       <HeroSlider movies={featured} />
 
       <div className="relative z-10 space-y-12 pb-20 pt-8">
+        {continueWatching.length > 0 && <CategoryRow title="Continue Watching" movies={continueWatching} />}
         <CategoryRow title="New Releases" movies={recent} />
         <CategoryRow title="Popular TV Shows" movies={tvShows} />
         {actionMovies.length > 0 && <CategoryRow title="Action & Adventure" movies={actionMovies} />}
         {sciFiMovies.length > 0 && <CategoryRow title="Sci-Fi & Fantasy" movies={sciFiMovies} />}
         {romanceMovies.length > 0 && <CategoryRow title="Feel Good Romance" movies={romanceMovies} />}
         {dramaMovies.length > 0 && <CategoryRow title="Compelling Dramas" movies={dramaMovies} />}
-        <CategoryRow title="Top Rated" movies={[...movies].sort((a, b) => b.rating - a.rating).slice(0, 10)} />
+        <CategoryRow title="Top Rated" movies={[...movies].sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0)).slice(0, 10)} />
       </div>
 
       <Footer />

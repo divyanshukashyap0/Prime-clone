@@ -4,10 +4,10 @@ import Footer from "@/components/Footer";
 import Loader from "@/components/Loader";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, writeBatch, getDoc, setDoc } from "firebase/firestore";
 import { Movie, Season, Episode } from "@/data/movies";
 import { toast } from "sonner";
-import { Plus, Trash2, Edit2, Search, Filter, Save, X, ExternalLink, Settings, Database, RefreshCw, AlertTriangle, Check, Film, Clock, Star, Info, ChevronRight, Layout, Play, List, BarChart3, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, Edit2, Search, Filter, Save, X, ExternalLink, Settings, Database, RefreshCw, AlertTriangle, Check, Film, Clock, Star, Info, ChevronRight, Layout, Play, List, BarChart3, Image as ImageIcon, Users } from "lucide-react";
 
 function SeasonSection({
     season,
@@ -230,11 +230,13 @@ export default function AdminDashboard() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [tmdbKey, setTmdbKey] = useState("");
     const [imdbKey, setImdbKey] = useState("");
+    const [loaderDuration, setLoaderDuration] = useState(4);
     const [isFetching, setIsFetching] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFetchingEpisodes, setIsFetchingEpisodes] = useState<number[]>([]);
     const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
     const [adminSearchQuery, setAdminSearchQuery] = useState("");
+    const [allUsers, setAllUsers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         title: "",
@@ -264,6 +266,8 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (activeTab === "manage-content") {
             fetchContent();
+        } else if (activeTab === "manage-users" || activeTab === "analytics") {
+            if (allUsers.length === 0) fetchUsers();
         }
 
         // Load settings
@@ -271,12 +275,56 @@ export default function AdminDashboard() {
         const savedImdb = localStorage.getItem("imdb_api_key");
         if (savedTmdb) setTmdbKey(savedTmdb);
         if (savedImdb) setImdbKey(savedImdb);
+
+        // Fetch global app settings
+        const fetchGlobalSettings = async () => {
+            try {
+                const docSnap = await getDoc(doc(db, "settings", "global"));
+                if (docSnap.exists() && docSnap.data().loaderDuration) {
+                    setLoaderDuration(docSnap.data().loaderDuration);
+                }
+            } catch (e) {
+                console.error("Failed to fetch global settings", e);
+            }
+        };
+        fetchGlobalSettings();
     }, [activeTab]);
 
-    const saveSettings = () => {
+    const fetchUsers = async () => {
+        try {
+            const usersSnap = await getDocs(collection(db, "users"));
+            const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAllUsers(usersList);
+        } catch (error) {
+            console.error("Failed to fetch users", error);
+            toast.error("Failed to fetch users");
+        }
+    };
+
+    const handleToggleAdmin = async (userId: string, currentRole: string) => {
+        try {
+            const newRole = currentRole === "admin" ? "user" : "admin";
+            await updateDoc(doc(db, "users", userId), { role: newRole });
+            toast.success(`User role updated to ${newRole}`);
+            fetchUsers();
+        } catch (error) {
+            toast.error("Failed to update user role");
+        }
+    };
+
+    const saveSettings = async () => {
         localStorage.setItem("tmdb_api_key", tmdbKey);
         localStorage.setItem("imdb_api_key", imdbKey);
-        toast.success("Settings saved successfully!");
+
+        try {
+            await setDoc(doc(db, "settings", "global"), {
+                loaderDuration: Number(loaderDuration)
+            }, { merge: true });
+            toast.success("Settings saved successfully!");
+        } catch (error) {
+            console.error("Error saving global settings", error);
+            toast.error("Failed to save global settings");
+        }
     };
 
     const addSeason = () => {
@@ -636,6 +684,7 @@ export default function AdminDashboard() {
         fetchContent(); // Re-fetch content to update UI
     };
 
+
     const fetchContent = async () => {
         try {
             // Fetch from both collections
@@ -703,6 +752,22 @@ export default function AdminDashboard() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            // Rickroll check
+            if (formData.youtubeId.includes("dQw4w9WgXcQ")) {
+                toast.error("Known placeholder detected (Rickroll). Please provide a valid YouTube ID.");
+                return;
+            }
+
+            // Empty source check
+            const hasVideoSource = formData.type === "tv-show"
+                ? formData.seasons?.some((s: any) => s.episodes?.some((ep: any) => ep.videoUrl))
+                : (formData.movieDriveID || formData.youtubeId);
+
+            if (!hasVideoSource && formData.type !== "live") {
+                const proceed = window.confirm("This content has no video source or trailer. Playing this item will show a 'Video Unavailable' screen. Save anyway?");
+                if (!proceed) return;
+            }
+
             const genresArray = Array.isArray(formData.genres)
                 ? formData.genres
                 : formData.genres.split(",").map((g: string) => g.trim());
@@ -858,6 +923,12 @@ export default function AdminDashboard() {
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${activeTab === "add-content" ? "bg-[#00a8e1] text-white" : "text-[#8197a4] hover:bg-white/5"}`}
                             >
                                 <Plus size={18} /> {isEditing ? "Edit Content" : "Add Content"}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("manage-users")}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${activeTab === "manage-users" ? "bg-[#00a8e1] text-white" : "text-[#8197a4] hover:bg-white/5"}`}
+                            >
+                                <Users size={18} /> Manage Users
                             </button>
                             <div className="pt-4 mt-4 border-t border-[#303c44] space-y-2">
                                 <button
@@ -1317,16 +1388,89 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="bg-[#1b252f] p-6 rounded-xl border border-[#303c44]">
                                     <p className="text-[#8197a4] text-sm font-bold mb-2 uppercase tracking-widest">Total Views</p>
-                                    <h3 className="text-3xl font-bold">12.8K</h3>
+                                    <h3 className="text-3xl font-bold">
+                                        {(() => {
+                                            let views = 0;
+                                            allUsers.forEach(u => {
+                                                if (u.history && Array.isArray(u.history)) views += u.history.length;
+                                            });
+                                            return views > 1000 ? (views / 1000).toFixed(1) + 'K' : views;
+                                        })()}
+                                    </h3>
                                 </div>
                                 <div className="bg-[#1b252f] p-6 rounded-xl border border-[#303c44]">
                                     <p className="text-[#8197a4] text-sm font-bold mb-2 uppercase tracking-widest">Avg. Watchtime</p>
-                                    <h3 className="text-3xl font-bold">42m</h3>
+                                    <h3 className="text-3xl font-bold">
+                                        {(() => {
+                                            let views = 0;
+                                            let totalSeconds = 0;
+                                            allUsers.forEach(u => {
+                                                if (u.history && Array.isArray(u.history)) {
+                                                    views += u.history.length;
+                                                    u.history.forEach((h: any) => {
+                                                        if (h.progress) totalSeconds += Number(h.progress) || 0;
+                                                    });
+                                                }
+                                            });
+                                            const avgSecs = views > 0 ? totalSeconds / views : 0;
+                                            return Math.floor(avgSecs / 60) + 'm';
+                                        })()}
+                                    </h3>
                                 </div>
                             </div>
                             <div className="bg-[#1b252f] p-8 rounded-xl border border-[#303c44] h-96 flex flex-col items-center justify-center text-[#8197a4]">
                                 <BarChart3 size={48} className="mb-4 opacity-20" />
                                 <p>Deep analytics integration coming soon.</p>
+                            </div>
+                        </div>
+                    ) : activeTab === "manage-users" ? (
+                        <div>
+                            <div className="flex justify-between items-end mb-8">
+                                <div>
+                                    <h1 className="text-3xl font-bold">User Management</h1>
+                                    <p className="text-[#8197a4]">Total users: {allUsers.length}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#1b252f] rounded-xl border border-[#303c44] overflow-hidden">
+                                <table className="w-full text-left">
+                                    <thead className="bg-[#0f171e] text-[#8197a4] text-xs uppercase font-bold">
+                                        <tr>
+                                            <th className="px-6 py-4">Name</th>
+                                            <th className="px-6 py-4">Email</th>
+                                            <th className="px-6 py-4">Verification</th>
+                                            <th className="px-6 py-4">Role</th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#303c44]">
+                                        {allUsers.map((u) => (
+                                            <tr key={u.id} className="hover:bg-white/5 transition-all text-sm group">
+                                                <td className="px-6 py-4 font-bold">{u.name || "N/A"}</td>
+                                                <td className="px-6 py-4 text-[#8197a4]">{u.email}</td>
+                                                <td className="px-6 py-4">
+                                                    {u.isEmailVerified ? (
+                                                        <span className="text-[#46d369] bg-[#46d369]/10 px-2 py-1 rounded text-xs">Verified</span>
+                                                    ) : (
+                                                        <span className="text-orange-400 bg-orange-400/10 px-2 py-1 rounded text-xs">Unverified</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 capitalize">{u.role || "user"}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button
+                                                        onClick={() => handleToggleAdmin(u.id, u.role || "user")}
+                                                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${u.role === "admin"
+                                                            ? "text-red-400 hover:bg-red-900/20"
+                                                            : "text-[#00a8e1] hover:bg-[#00a8e1]/10"
+                                                            }`}
+                                                    >
+                                                        {u.role === "admin" ? "Demote from Admin" : "Make Admin"}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     ) : (
@@ -1390,6 +1534,29 @@ export default function AdminDashboard() {
                                         <p className="text-xs text-[#8197a4]">
                                             These keys are used to automatically fetch movie details, posters, and cast information.
                                         </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 bg-[#1b252f] rounded-xl border border-[#303c44] space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <Layout size={24} className="text-[#00a8e1]" />
+                                        <h3 className="text-lg font-bold">App Settings</h3>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-[#8197a4] mb-2">Loader Video Duration (Seconds)</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="15"
+                                                value={loaderDuration}
+                                                onChange={(e) => setLoaderDuration(Number(e.target.value))}
+                                                className="w-full bg-[#0f171e] border border-[#303c44] rounded px-4 py-2 focus:border-primary outline-none"
+                                            />
+                                            <p className="text-xs text-[#8197a4] mt-2">
+                                                Controls how long the initial startup video loader plays for all users.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 

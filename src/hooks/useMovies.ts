@@ -23,6 +23,9 @@ export const useMovies = () => {
                     return [];
                 };
 
+                const isRickroll = (val: any) => typeof val === 'string' && val.includes("dQw4w9WgXcQ");
+                const getValid = (val: any) => isRickroll(val) ? "" : val;
+
                 const newMovies = moviesSnap.docs.map((doc) => {
                     const data = doc.data();
                     const genres = normalizeArray(data.genres || data.tags);
@@ -33,7 +36,7 @@ export const useMovies = () => {
                         ...data,
                         genres,
                         cast,
-                        movieDriveID: data.movieDriveID || data.movieDriveId || data.videoUrl || "",
+                        movieDriveID: getValid(data.movieDriveID || data.movieDriveId || data.videoUrl || ""),
                         isPublished: data.isPublished ?? true,
                         allowDownload: data.allowDownload ?? true,
                         allowPlayback: data.allowPlayback ?? true,
@@ -51,11 +54,12 @@ export const useMovies = () => {
                         ...data,
                         genres,
                         cast,
-                        movieDriveID: data.movieDriveID || data.movieDriveId || data.videoUrl || "",
+                        movieDriveID: getValid(data.movieDriveID || data.movieDriveId || data.videoUrl || ""),
                         isPublished: data.isPublished ?? true,
                         allowDownload: data.allowDownload ?? true,
                         allowPlayback: data.allowPlayback ?? true,
                         quality: data.quality || "HD",
+                        youtubeId: getValid(data.youtubeId) || getValid(data.trailerUrl ? data.trailerUrl.split('v=')[1] : ""),
                     };
                 }) as Movie[];
 

@@ -4,13 +4,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import type { Movie } from "@/data/movies";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { ThumbsUp, Check } from "lucide-react";
 
 interface MovieCardProps {
-  movie: Movie;
+  movie: Movie & { playbackProgress?: number; playbackDuration?: number };
   index?: number;
 }
 
 export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
+  const { preferences, toggleWatchlist, toggleLike } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimer = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,6 +58,14 @@ export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
           <div className="absolute top-2 left-2">
             <img src="/logo.png" alt="Prime" className="h-4 shadow-xl" />
           </div>
+          {movie.playbackProgress && movie.playbackDuration && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+              <div
+                className="h-full bg-[#00a8e1] transition-all duration-300"
+                style={{ width: `${((movie.playbackProgress || 0) / (movie.playbackDuration || 1)) * 100}%` }}
+              />
+            </div>
+          )}
         </div>
         <div className="mt-2 px-1">
           <h3 className="text-sm md:text-base font-bold text-white truncate group-hover:text-[#00a8e1] transition-colors">
@@ -103,10 +114,34 @@ export default function MovieCard({ movie, index = 0 }: MovieCardProps) {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toast.success("Added to Watchlist"); }}
-                      className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors" title="Add to Watchlist"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleWatchlist(movie.id);
+                        toast.success(preferences.watchlist.includes(movie.id) ? "Removed from Watchlist" : "Added to Watchlist");
+                      }}
+                      className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${preferences.watchlist.includes(movie.id)
+                        ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                        : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                        }`}
+                      title="Watchlist"
                     >
-                      <Plus size={20} />
+                      {preferences.watchlist.includes(movie.id) ? <Check size={20} /> : <Plus size={20} />}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleLike(movie.id);
+                        if (!preferences.likes.includes(movie.id)) toast.success("Added to Liked Videos");
+                      }}
+                      className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${preferences.likes.includes(movie.id)
+                        ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                        : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                        }`}
+                      title="I like this"
+                    >
+                      <ThumbsUp size={18} className={preferences.likes.includes(movie.id) ? "fill-white" : ""} />
                     </button>
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); toast.info("Trailer playback coming soon!"); }}

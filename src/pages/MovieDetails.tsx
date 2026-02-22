@@ -10,6 +10,7 @@ import Loader from "@/components/Loader";
 import { useMovies } from "@/hooks/useMovies";
 import VolumeBoosterHint from "@/components/VolumeBoosterHint";
 import VideoPlayer from "@/components/VideoPlayer";
+import { useAuth } from "@/context/AuthContext";
 
 export default function MovieDetails() {
   const { id } = useParams();
@@ -18,10 +19,19 @@ export default function MovieDetails() {
   const movie = movies.find((m) => m.id === id);
   const [showPlayer, setShowPlayer] = useState(false);
   const [playerUrl, setPlayerUrl] = useState("");
-  const isTVShow = movie.type === "tv-show";
+  const isTVShow = movie?.type === "tv-show";
   const [activeTab, setActiveTab] = useState(isTVShow ? "episodes" : "trailers");
   const [selectedSeasonIdx, setSelectedSeasonIdx] = useState(0);
   const [isSeasonDropdownOpen, setIsSeasonDropdownOpen] = useState(false);
+
+  const { preferences, toggleWatchlist, toggleLike, toggleDislike, toggleDownload, updateProgress, rateContent } = useAuth();
+
+  // Get current movie progress from history
+  const currentHistory = preferences.history.find(h => h.movieId === movie?.id);
+  const startSeconds = currentHistory?.progress || 0;
+
+  // Get user rating
+  const userRating = preferences.ratings.find(r => r.movieId === movie?.id)?.rating || 0;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -42,7 +52,7 @@ export default function MovieDetails() {
 
   const handlePlay = (url: string) => {
     if (!url) {
-      alert("Video URL not found for this content.");
+      toast.error("Video URL not found for this content.");
       return;
     }
     setPlayerUrl(url);
@@ -101,14 +111,41 @@ export default function MovieDetails() {
               {movie.title}
             </h1>
 
+            {/* Rating and Meta Indicators */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-1 group">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => {
+                      rateContent(movie.id, star);
+                      toast.success(`Rated ${star} stars!`);
+                    }}
+                    className="p-1 transition-transform hover:scale-125 focus:outline-none"
+                  >
+                    <Star
+                      size={24}
+                      className={`transition-colors ${star <= userRating ? "fill-[#00a8e1] text-[#00a8e1]" : "text-white/20 hover:text-white/50"}`}
+                    />
+                  </button>
+                ))}
+              </div>
+              <div className="h-4 w-px bg-white/10" />
+              <div className="flex items-center gap-2 text-[#46d369] font-black text-sm">
+                <Star size={16} fill="currentColor" />
+                <span>{movie.vote_average?.toFixed(1) || "8.5"} / 10 Match</span>
+              </div>
+            </div>
+
             {/* Action Bar */}
             <div className="flex flex-wrap items-center gap-4">
               {(movie.allowPlayback !== false) && (
                 <button
                   onClick={() => handlePlay(isTVShow ? (movie.seasons?.[0]?.episodes?.[0]?.videoUrl || "") : (movie.movieDriveID || ""))}
-                  className="flex items-center gap-3 bg-white text-black font-black px-10 py-4 rounded hover:bg-white/90 transition-all text-lg"
+                  className="flex items-center gap-3 bg-white text-black font-black px-10 py-4 rounded hover:bg-white/90 transition-all text-lg group"
                 >
-                  <Play size={24} fill="black" /> {movie.type === "tv-show" ? "Watch S1 E1" : "View Now"}
+                  <Play size={24} fill="black" className="group-hover:scale-110 transition-transform" />
+                  {startSeconds > 60 ? `Continue (at ${Math.floor(startSeconds / 60)}m)` : (movie.type === "tv-show" ? "Watch S1 E1" : "View Now")}
                 </button>
               )}
 
@@ -118,18 +155,60 @@ export default function MovieDetails() {
                 </div>
               )}
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2 md:gap-3">
                 {[
-                  { icon: <Plus size={24} />, label: "Watchlist", action: () => toast.success("Added to Watchlist") },
-                  { icon: <ThumbsUp size={24} />, label: "Like", action: () => toast.success("Added to Liked Videos") },
-                  { icon: <ThumbsDown size={24} />, label: "Dislike", action: () => toast.info("Feedback received") },
-                  { icon: <Share2 size={24} />, label: "Share", action: () => { navigator.clipboard.writeText(window.location.href); toast.success("Link copied to clipboard!"); } },
-                  ...(movie.allowDownload !== false ? [{ icon: <Download size={24} />, label: "Download", action: () => toast.info("Download started...") }] : []),
+                  {
+                    icon: preferences.watchlist.includes(movie.id) ? <Check size={24} className="text-[#00a8e1]" /> : <Plus size={24} />,
+                    label: "Watchlist",
+                    active: preferences.watchlist.includes(movie.id),
+                    action: () => {
+                      toggleWatchlist(movie.id);
+                      toast.success(preferences.watchlist.includes(movie.id) ? "Removed from Watchlist" : "Added to Watchlist");
+                    }
+                  },
+                  {
+                    icon: <ThumbsUp size={24} className={preferences.likes.includes(movie.id) ? "fill-[#00a8e1] text-[#00a8e1]" : ""} />,
+                    label: "Like",
+                    active: preferences.likes.includes(movie.id),
+                    action: () => {
+                      toggleLike(movie.id);
+                      if (!preferences.likes.includes(movie.id)) toast.success("Added to Liked Videos");
+                    }
+                  },
+                  {
+                    icon: <ThumbsDown size={24} className={preferences.dislikes.includes(movie.id) ? "fill-[#00a8e1] text-[#00a8e1]" : ""} />,
+                    label: "Dislike",
+                    active: preferences.dislikes.includes(movie.id),
+                    action: () => {
+                      toggleDislike(movie.id);
+                      if (!preferences.dislikes.includes(movie.id)) toast.info("Marked as Not for me");
+                    }
+                  },
+                  {
+                    icon: <Share2 size={24} />,
+                    label: "Share",
+                    action: () => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success("Link copied to clipboard!");
+                    }
+                  },
+                  ...(movie.allowDownload !== false ? [{
+                    icon: <Download size={24} className={preferences.downloads.includes(movie.id) ? "text-[#00a8e1]" : ""} />,
+                    label: "Download",
+                    active: preferences.downloads.includes(movie.id),
+                    action: () => {
+                      toggleDownload(movie.id);
+                      toast.success("Download started...");
+                    }
+                  }] : []),
                 ].map((action, i) => (
                   <button
                     key={i}
                     onClick={action.action}
-                    className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-colors group relative"
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all group relative border ${(action as any).active
+                      ? "bg-[#00a8e1]/20 border-[#00a8e1]/50"
+                      : "bg-white/10 hover:bg-white/20 border-white/10"
+                      }`}
                   >
                     {action.icon}
                     <span className="absolute -bottom-8 bg-black/80 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -319,7 +398,7 @@ export default function MovieDetails() {
                 <div className="max-w-4xl mx-auto space-y-6">
                   <div className="aspect-video rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black relative">
                     <iframe
-                      src={`https://www.youtube.com/embed/${movie.youtubeId}?autoplay=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0`}
+                      src={`https://www.youtube.com/embed/${movie.youtubeId}?autoplay=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&vq=hd1080`}
                       className="w-full h-full border-none scale-[1.15] origin-center"
                       allowFullScreen
                       allow="autoplay; encrypted-media"
@@ -417,6 +496,8 @@ export default function MovieDetails() {
               <VideoPlayer
                 url={playerUrl}
                 poster={movie.backdrop_path || movie.poster_path}
+                startTime={startSeconds}
+                onProgress={(p, d) => updateProgress(movie.id, p, d)}
               />
             </div>
           </motion.div>

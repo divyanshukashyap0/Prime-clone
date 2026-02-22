@@ -4,6 +4,7 @@ import { Search, Grid, Bookmark, User, LayoutGrid, X, Plus, HelpCircle, Settings
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useMovies } from "@/hooks/useMovies";
+import { toast } from "sonner";
 
 const navLinks = [
   { label: "Home", to: "/" },
@@ -20,8 +21,32 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { logout, user } = useAuth();
+  const { logout, user, preferences, activeProfile, switchProfile } = useAuth();
   const { data: movies = [] } = useMovies();
+
+  const [pinPromptInfo, setPinPromptInfo] = useState<{ id: string, pin: string } | null>(null);
+  const [enteredPin, setEnteredPin] = useState("");
+
+  const handleProfileClick = (profile: any) => {
+    if (profile.pin && preferences.activeProfileId !== profile.id) {
+      setPinPromptInfo({ id: profile.id, pin: profile.pin });
+      setEnteredPin("");
+      setIsProfileOpen(false);
+    } else {
+      switchProfile(profile.id);
+      setIsProfileOpen(false);
+    }
+  };
+
+  const handlePinSubmit = () => {
+    if (pinPromptInfo && enteredPin === pinPromptInfo.pin) {
+      switchProfile(pinPromptInfo.id);
+      setPinPromptInfo(null);
+      toast.success("Profile switched");
+    } else {
+      toast.error("Incorrect PIN");
+    }
+  };
 
   const searchResults = searchValue.length > 1
     ? movies.filter(m => {
@@ -48,9 +73,9 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 flex items-start justify-between px-4 md:px-12 pt-5 pointer-events-none transition-all duration-700 h-[130px] ${scrolled
-        ? "bg-[#0f171e]/95 backdrop-blur-md shadow-lg"
-        : "bg-gradient-to-b from-black/90 via-black/40 to-transparent"
+      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-12 pointer-events-none transition-all duration-700 h-20 ${scrolled
+        ? "bg-[#0f171e]/90 backdrop-blur-xl shadow-2xl"
+        : "bg-gradient-to-b from-black/80 to-transparent"
         }`}
     >
       {/* Gradient Bottom Edge */}
@@ -60,31 +85,40 @@ export default function Navbar() {
           <img
             src="/logo.png"
             alt="Prime Video"
-            className="h-6 md:h-8"
+            className="h-5 md:h-6"
           />
         </Link>
 
-        <div className={`hidden lg:flex items-center gap-6 h-full transition-all duration-300 ${searchFocused ? "opacity-30 blur-sm scale-95 pointer-events-none" : "opacity-100"}`}>
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              to={link.to}
-              className={`text-[15px] font-extrabold transition-all hover:text-white border-b-2 py-6 ${location.pathname === link.to
-                ? "text-white border-[#00a8e1]"
-                : "text-[#8197a4] border-transparent"
-                }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+        <div className={`hidden lg:flex items-center gap-8 h-full transition-all duration-300 ${searchFocused ? "opacity-30 blur-sm scale-95 pointer-events-none" : "opacity-100"}`}>
+          {navLinks.map((link) => {
+            const isActive = location.pathname === link.to;
+            return (
+              <Link
+                key={link.label}
+                to={link.to}
+                className={`text-sm font-semibold transition-all duration-300 relative px-1 py-1 ${isActive ? "text-white" : "text-[#8197a4] hover:text-white"}`}
+              >
+                {link.label}
+                {isActive && (
+                  <motion.div
+                    layoutId="nav-underline"
+                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#00a8e1] rounded-full shadow-[0_0_8px_rgba(0,168,225,0.6)]"
+                  />
+                )}
+              </Link>
+            );
+          })}
           <Link
             to="/subscriptions"
-            className={`text-[15px] font-extrabold transition-all hover:text-white border-b-2 py-6 ${location.pathname === "/subscriptions"
-              ? "text-white border-[#00a8e1]"
-              : "text-[#8197a4] border-transparent"
-              }`}
+            className={`text-sm font-semibold transition-all duration-300 relative px-1 py-1 ${location.pathname === "/subscriptions" ? "text-white" : "text-[#8197a4] hover:text-white"}`}
           >
             Subscriptions
+            {location.pathname === "/subscriptions" && (
+              <motion.div
+                layoutId="nav-underline"
+                className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#00a8e1] rounded-full shadow-[0_0_8px_rgba(0,168,225,0.6)]"
+              />
+            )}
           </Link>
         </div>
       </div>
@@ -107,9 +141,9 @@ export default function Navbar() {
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }
               }}
-              className="p-2 text-white hover:scale-110 transition-transform"
+              className="p-2 text-[#8197a4] hover:text-white hover:scale-110 transition-all duration-300"
             >
-              <Search size={22} strokeWidth={2.5} />
+              <Search size={20} strokeWidth={2} />
             </button>
 
             <input
@@ -192,8 +226,8 @@ export default function Navbar() {
         </div>
 
         <div className={`pointer-events-auto flex items-center gap-6 transition-all duration-300 ${searchFocused ? "opacity-0 translate-x-10 pointer-events-none" : "opacity-100"}`}>
-          <Link to="/mystuff" className="text-[#8197a4] hover:text-white transition-colors">
-            <Bookmark size={24} strokeWidth={2.5} />
+          <Link to="/mystuff" className="text-[#8197a4] hover:text-white transition-all duration-300 hover:scale-110">
+            <Bookmark size={20} strokeWidth={2} />
           </Link>
 
           <div
@@ -202,12 +236,13 @@ export default function Navbar() {
             onMouseLeave={() => setIsProfileOpen(false)}
           >
             <button
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00a8e1] to-[#60c9ff] flex items-center justify-center border border-white/20 overflow-hidden hover:ring-2 ring-[#00a8e1] transition-all overflow-hidden"
+              className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 overflow-hidden hover:ring-2 transition-all"
+              style={{ backgroundColor: activeProfile?.avatarColor || "#00a8e1" }}
             >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <User size={22} className="text-white" />
+                <User size={18} className="text-white" />
               )}
             </button>
 
@@ -242,21 +277,42 @@ export default function Navbar() {
                     </div>
                   </div>
 
-                  {/* Right Column: Profile */}
+                  {/* Right Column: Profile Switcher */}
                   <div className="flex-1 p-6 bg-white/5">
-                    <h4 className="text-[#8197a4] text-xs font-black uppercase tracking-widest mb-6">Profile</h4>
-                    <div className="space-y-4">
-                      <Link to="/profiles/new" className="flex items-center gap-3 text-white/90 hover:text-white font-bold transition-colors group">
+                    <h4 className="text-[#8197a4] text-xs font-black uppercase tracking-widest mb-6">Profiles</h4>
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                      {preferences.profiles.map(p => (
+                        <div key={p.id} className="relative group">
+                          <button
+                            onClick={() => handleProfileClick(p)}
+                            className={`flex items-center justify-between w-full ${preferences.activeProfileId === p.id ? "pointer-events-none" : ""}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${preferences.activeProfileId === p.id ? "ring-2 ring-[#00a8e1] ring-offset-2 ring-offset-[#1a242f]" : ""}`}
+                                style={{ backgroundColor: p.avatarColor }}
+                              >
+                                <User size={14} className="text-white" />
+                              </div>
+                              <span className={`font-bold transition-colors ${preferences.activeProfileId === p.id ? "text-[#00a8e1]" : "text-white/90 group-hover:text-white"}`}>
+                                {p.name}
+                              </span>
+                            </div>
+                            <Link
+                              to={`/profiles/edit/${p.id}`}
+                              className="p-1.5 rounded-full hover:bg-white/10 text-[#8197a4] hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                            >
+                              <Edit3 size={14} />
+                            </Link>
+                          </button>
+                        </div>
+                      ))}
+
+                      <Link to="/profiles/new" className="flex items-center gap-3 text-white/90 hover:text-white font-bold transition-colors group pt-2">
                         <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-all">
                           <Plus size={16} />
                         </div>
-                        Add new
-                      </Link>
-                      <Link to="/profiles/edit" className="flex items-center gap-3 text-white/90 hover:text-white font-bold transition-colors">
-                        Edit Profile
-                      </Link>
-                      <Link to="/profiles/learn-more" className="flex items-center gap-3 text-white/90 hover:text-white font-bold transition-colors">
-                        Learn More
+                        Add new profile
                       </Link>
                     </div>
                   </div>
@@ -266,6 +322,31 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* PIN Prompt Modal */}
+      {pinPromptInfo && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm pointer-events-auto">
+          <div className="bg-[#1b252f] rounded-2xl p-8 max-w-sm w-full border border-white/10 shadow-2xl relative">
+            <button onClick={() => setPinPromptInfo(null)} className="absolute top-4 right-4 text-[#8197a4] hover:text-white">
+              <X size={20} />
+            </button>
+            <h2 className="text-2xl font-black mb-2 text-white">Enter PIN</h2>
+            <p className="text-[#8197a4] text-sm mb-6">This profile is PIN protected.</p>
+            <input
+              type="password"
+              autoFocus
+              maxLength={4}
+              value={enteredPin}
+              onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={(e) => e.key === 'Enter' && handlePinSubmit()}
+              className="w-full bg-[#0f171e] text-white border border-white/10 rounded-lg px-5 py-4 text-center text-3xl tracking-[0.5em] font-black outline-none focus:border-[#00a8e1] transition-all mb-6"
+            />
+            <button onClick={handlePinSubmit} className="w-full py-4 bg-[#00a8e1] hover:bg-[#00a8e1]/90 text-white rounded-lg font-black transition-all">
+              Unlock Profile
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

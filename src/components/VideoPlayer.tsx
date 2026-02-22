@@ -60,6 +60,7 @@ const QUALITY_VQ: Record<string, string> = {
 };
 
 import { loadYTApi } from '../lib/youtube';
+import { useAuth } from '@/context/AuthContext';
 
 function extractYTId(url: string): string {
     if (url.includes('v=')) return url.split('v=')[1].split('&')[0];
@@ -74,9 +75,15 @@ function buildEmbedUrl(videoId: string, vq = 'hd1080', startSeconds = 0) {
     return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${origin}&autoplay=1&controls=0&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&playsinline=1&fs=0&vq=${vq}${start}`;
 }
 
-interface VideoPlayerProps { url: string; poster?: string; }
+interface VideoPlayerProps {
+    url: string;
+    poster?: string;
+    onProgress?: (progress: number, duration: number) => void;
+    startTime?: number;
+}
 
-export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
+export default function VideoPlayer({ url, poster, onProgress, startTime = 0 }: VideoPlayerProps) {
+    const { preferences } = useAuth();
     const containerRef = useRef<HTMLDivElement>(null);
     const ytDivRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -91,6 +98,9 @@ export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
     const isGDrive = !isYouTube && (url.includes('drive.google.com') || (url.length > 15 && !url.includes('.')));
     const videoId = isYouTube ? extractYTId(url) : '';
 
+    const isRickroll = videoId === 'dQw4w9WgXcQ';
+    const isInvalid = !url || (isYouTube && !videoId);
+
     const [playing, setPlaying] = useState(false);
     const [muted, setMuted] = useState(false);
     const [volume, setVolume] = useState(100);
@@ -102,7 +112,11 @@ export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
     const [showControls, setShowControls] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showQuality, setShowQuality] = useState(false);
-    const [quality, setQuality] = useState('hd1080');
+
+    const userPrefQuality = preferences.profiles.find(p => p.id === preferences.activeProfileId)?.preferences.defaultQuality;
+    const initialQuality = userPrefQuality === '1080p' ? 'hd1080' : userPrefQuality === '720p' ? 'hd720' : userPrefQuality === '480p' ? 'large' : 'default';
+
+    const [quality, setQuality] = useState<string>(initialQuality);
     const [availableQualities, setAvailableQualities] = useState<string[]>([]);
     const [showVol, setShowVol] = useState(false);
     const [ended, setEnded] = useState(false);
@@ -110,7 +124,10 @@ export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
 
     // Key used to force-recreate the iframe when quality changes
     const [embedKey, setEmbedKey] = useState(0);
-    const resumeTimeRef = useRef(0);
+    const resumeTimeRef = useRef(startTime);
+
+    // ── Fallback UI for invalid/unwanted sources ──────────────────────────────
+    // ... (rest of guards)
 
     // ── YouTube IFrame API ────────────────────────────────────────────────────
     useEffect(() => {
@@ -143,12 +160,16 @@ export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
                             try {
                                 const p = playerRef.current;
                                 if (!p) return;
-                                setCurrentTime(p.getCurrentTime());
+                                const ct = p.getCurrentTime();
                                 const d = p.getDuration();
-                                if (d > 0) setDuration(d);
+                                setCurrentTime(ct);
+                                if (d > 0) {
+                                    setDuration(d);
+                                    if (onProgress) onProgress(ct, d);
+                                }
                                 setBuffered(p.getVideoLoadedFraction() * d);
                             } catch { /* ignore */ }
-                        }, 500);
+                        }, 1000);
                     },
                     onStateChange: (e) => {
                         const S = window.YT?.PlayerState;
@@ -180,7 +201,10 @@ export default function VideoPlayer({ url, poster }: VideoPlayerProps) {
         if (!v || isYouTube || isGDrive) return;
         const h = (ev: string, fn: EventListener) => { v.addEventListener(ev, fn); return () => v.removeEventListener(ev, fn); };
         const cleanups = [
-            h('timeupdate', () => setCurrentTime(v.currentTime)),
+            h('timeupdate', () => {
+                setCurrentTime(v.currentTime);
+                if (onProgress && v.duration > 0) onProgress(v.currentTime, v.duration);
+            }),
             h('durationchange', () => setDuration(v.duration)),
             h('play', () => { setPlaying(true); setEnded(false); }),
             h('pause', () => setPlaying(false)),

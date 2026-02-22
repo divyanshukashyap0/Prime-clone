@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Movie } from "@/data/movies";
+import { useAuth } from "@/context/AuthContext";
+import { ThumbsUp, ThumbsDown, Share2, Download as DownloadIcon } from "lucide-react";
 
 import { loadYTApi } from "@/lib/youtube";
 
@@ -12,6 +14,7 @@ interface HeroSliderProps {
 }
 
 export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
+  const { preferences, toggleWatchlist, toggleLike, toggleDislike, toggleDownload } = useAuth();
   const displayMovies = (propMovies && propMovies.length > 0) ? propMovies : [];
   const [current, setCurrent] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
@@ -55,6 +58,7 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
         iv_load_policy: 3,
         disablekb: 1,
         showinfo: 0,
+        vq: 'hd1080',
       },
       events: {
         onStateChange: (event: any) => {
@@ -207,18 +211,76 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
                 <span className="text-[#0f171e] group-hover:text-white text-xs font-bold opacity-70 block ml-6">Watch with a Prime membership</span>
               </Link>
 
-              <div className="flex items-center gap-3">
-                <Link
-                  to={`/movie/${movie.id}?playTrailer=true`}
-                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all shadow-lg backdrop-blur-sm group" title="Watch Trailer"
-                >
-                  <Film size={20} className="group-hover:scale-110 transition-transform" />
-                </Link>
+              <div className="flex items-center gap-2 md:gap-3">
                 <button
-                  onClick={() => toast.success("Added to Watchlist")}
-                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all shadow-lg backdrop-blur-sm group" title="Add to Watchlist"
+                  onClick={() => {
+                    toggleWatchlist(movie.id);
+                    toast.success(preferences.watchlist.includes(movie.id) ? "Removed from Watchlist" : "Added to Watchlist");
+                  }}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg backdrop-blur-sm group border ${preferences.watchlist.includes(movie.id)
+                      ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                      : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                    }`}
+                  title="Watchlist"
                 >
-                  <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                  {preferences.watchlist.includes(movie.id) ? (
+                    <Check size={20} className="scale-110" />
+                  ) : (
+                    <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleLike(movie.id);
+                    if (!preferences.likes.includes(movie.id)) toast.success("Added to Liked Videos");
+                  }}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg backdrop-blur-sm group border ${preferences.likes.includes(movie.id)
+                      ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                      : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                    }`}
+                  title="I like this"
+                >
+                  <ThumbsUp size={20} className={preferences.likes.includes(movie.id) ? "fill-white" : "group-hover:scale-110 transition-transform"} />
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleDislike(movie.id);
+                    if (!preferences.dislikes.includes(movie.id)) toast.info("Marked as Not for me");
+                  }}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg backdrop-blur-sm group border ${preferences.dislikes.includes(movie.id)
+                      ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                      : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                    }`}
+                  title="Not for me"
+                >
+                  <ThumbsDown size={20} className={preferences.dislikes.includes(movie.id) ? "fill-white" : "group-hover:scale-110 transition-transform"} />
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.origin + `/movie/${movie.id}`);
+                    toast.success("Link copied to clipboard");
+                  }}
+                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all shadow-lg backdrop-blur-sm group"
+                  title="Share"
+                >
+                  <Share2 size={20} className="group-hover:scale-110 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleDownload(movie.id);
+                    toast.success("Download started...");
+                  }}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg backdrop-blur-sm group border ${preferences.downloads.includes(movie.id)
+                      ? "bg-[#00a8e1] border-[#00a8e1] text-white"
+                      : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                    }`}
+                  title="Download"
+                >
+                  <DownloadIcon size={20} className="group-hover:scale-110 transition-transform" />
                 </button>
               </div>
             </div>

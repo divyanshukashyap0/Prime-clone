@@ -13,22 +13,37 @@ const avatarColors = [
 const maturityRatings = ["Little Kids (U)", "Older Kids (U/A 7+)", "Teens (U/A 13+)", "Adults (A)"];
 
 export default function AddProfilePage() {
-    const { user } = useAuth();
+    const { user, addProfile } = useAuth();
     const navigate = useNavigate();
     const [name, setName] = useState("");
     const [selectedColor, setSelectedColor] = useState(avatarColors[0]);
     const [maturity, setMaturity] = useState("Teens (U/A 13+)");
+    const [pin, setPin] = useState("");
+    const [quality, setQuality] = useState("Auto");
     const [saving, setSaving] = useState(false);
+
+    const qualities = ["Auto", "1080p", "720p", "480p"];
 
     if (!user) { navigate("/login"); return null; }
 
     const handleSave = async () => {
         if (!name.trim()) { toast.error("Please enter a profile name"); return; }
         setSaving(true);
-        await new Promise(r => setTimeout(r, 800)); // simulate save
-        toast.success(`Profile "${name}" created!`);
-        navigate("/account");
-        setSaving(false);
+        try {
+            await addProfile({
+                name: name.trim(),
+                avatarColor: selectedColor,
+                maturityRating: maturity,
+                pin: pin || undefined,
+                preferences: { autoplay: true, previews: true, defaultQuality: quality }
+            });
+            toast.success(`Profile "${name}" created!`);
+            navigate("/account");
+        } catch (error) {
+            toast.error("Failed to create profile");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -97,6 +112,31 @@ export default function AddProfilePage() {
                                     {r}
                                 </button>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* Security & Settings */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-black text-[#8197a4] mb-2 uppercase tracking-widest">Profile PIN (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="4-digit PIN"
+                                maxLength={4}
+                                value={pin}
+                                onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
+                                className="w-full bg-[#1b252f] border border-white/10 rounded-lg px-5 py-4 font-bold text-white placeholder-[#8197a4] outline-none focus:border-[#00a8e1] transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-black text-[#8197a4] mb-2 uppercase tracking-widest">Video Quality</label>
+                            <select
+                                value={quality}
+                                onChange={e => setQuality(e.target.value)}
+                                className="w-full bg-[#1b252f] border border-white/10 rounded-lg px-5 py-4 font-bold text-white outline-none focus:border-[#00a8e1] transition-all appearance-none cursor-pointer"
+                            >
+                                {qualities.map(q => <option key={q} value={q}>{q}</option>)}
+                            </select>
                         </div>
                     </div>
 
