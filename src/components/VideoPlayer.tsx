@@ -59,23 +59,7 @@ const QUALITY_VQ: Record<string, string> = {
     large: 'large', medium: 'medium', small: 'small', tiny: 'tiny',
 };
 
-let ytApiLoaded = false;
-function loadYTApi(): Promise<void> {
-    if (ytApiLoaded && window.YT?.Player) return Promise.resolve();
-    return new Promise((resolve) => {
-        if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-            const wait = setInterval(() => {
-                if (window.YT?.Player) { clearInterval(wait); ytApiLoaded = true; resolve(); }
-            }, 100);
-            return;
-        }
-        const prev = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => { ytApiLoaded = true; prev?.(); resolve(); };
-        const s = document.createElement('script');
-        s.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(s);
-    });
-}
+import { loadYTApi } from '../lib/youtube';
 
 function extractYTId(url: string): string {
     if (url.includes('v=')) return url.split('v=')[1].split('&')[0];

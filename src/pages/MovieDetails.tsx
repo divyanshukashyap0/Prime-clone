@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { Play, Plus, Star, ArrowLeft, Clock, Calendar, X, Film, ThumbsUp, ThumbsDown, Share2, Download, Info, Check } from "lucide-react";
+import { Play, Plus, Star, ArrowLeft, Clock, Calendar, X, Film, ThumbsUp, ThumbsDown, Share2, Download, Info, Check, ChevronRight, Layout } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -21,13 +21,24 @@ export default function MovieDetails() {
   const isTVShow = movie.type === "tv-show";
   const [activeTab, setActiveTab] = useState(isTVShow ? "episodes" : "trailers");
   const [selectedSeasonIdx, setSelectedSeasonIdx] = useState(0);
+  const [isSeasonDropdownOpen, setIsSeasonDropdownOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("playTrailer") === "true") {
       setActiveTab("trailers");
     }
-  }, []);
+
+    if (params.get("autoplay") === "true" && movie) {
+      const url = isTVShow
+        ? (movie.seasons?.[0]?.episodes?.[0]?.videoUrl || "")
+        : (movie.movieDriveID || "");
+
+      if (url) {
+        handlePlay(url);
+      }
+    }
+  }, [movie, isTVShow]);
 
   const handlePlay = (url: string) => {
     if (!url) {
@@ -94,7 +105,7 @@ export default function MovieDetails() {
             <div className="flex flex-wrap items-center gap-4">
               {(movie.allowPlayback !== false) && (
                 <button
-                  onClick={() => handlePlay(movie.movieDriveID || (hasSeasons ? movie.seasons![0].episodes[0]?.videoUrl : ""))}
+                  onClick={() => handlePlay(isTVShow ? (movie.seasons?.[0]?.episodes?.[0]?.videoUrl || "") : (movie.movieDriveID || ""))}
                   className="flex items-center gap-3 bg-white text-black font-black px-10 py-4 rounded hover:bg-white/90 transition-all text-lg"
                 >
                   <Play size={24} fill="black" /> {movie.type === "tv-show" ? "Watch S1 E1" : "View Now"}
@@ -202,16 +213,59 @@ export default function MovieDetails() {
               {hasSeasons ? (
                 <>
                   <div className="flex items-center gap-6">
-                    <select
-                      value={selectedSeasonIdx}
-                      onChange={(e) => setSelectedSeasonIdx(parseInt(e.target.value))}
-                      className="bg-[#1b252f] text-white font-bold p-4 rounded-lg border border-white/10 outline-none hover:border-[#00a8e1] transition-all cursor-pointer min-w-[200px] text-lg"
-                    >
-                      {movie.seasons!.map((s, idx) => (
-                        <option key={idx} value={idx}>Season {s.seasonNumber}</option>
-                      ))}
-                    </select>
-                    <span className="text-[#8197a4] font-bold">{currentSeason?.episodes.length} Episodes</span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsSeasonDropdownOpen(!isSeasonDropdownOpen)}
+                        className="bg-[#1b252f]/80 hover:bg-[#1b252f] text-white font-bold p-4 py-3 rounded border border-white/10 outline-none hover:border-[#00a8e1] transition-all cursor-pointer min-w-[220px] text-lg flex items-center justify-between group"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Layout size={18} className="text-[#00a8e1]" />
+                          Season {movie.seasons![selectedSeasonIdx].seasonNumber}
+                        </span>
+                        <motion.div
+                          animate={{ rotate: isSeasonDropdownOpen ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronRight size={20} className="rotate-90 group-hover:text-[#00a8e1] transition-colors" />
+                        </motion.div>
+                      </button>
+
+                      <AnimatePresence>
+                        {isSeasonDropdownOpen && (
+                          <>
+                            {/* Backdrop to close dropdown */}
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setIsSeasonDropdownOpen(false)}
+                            />
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute top-full left-0 mt-2 w-full bg-[#1b252f] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden py-2"
+                            >
+                              {movie.seasons!.map((s, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setSelectedSeasonIdx(idx);
+                                    setIsSeasonDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-5 py-3 hover:bg-white/5 transition-colors flex items-center justify-between group ${selectedSeasonIdx === idx ? "text-[#00a8e1]" : "text-white"
+                                    }`}
+                                >
+                                  <span className="font-bold">Season {s.seasonNumber}</span>
+                                  {selectedSeasonIdx === idx && (
+                                    <Check size={18} />
+                                  )}
+                                </button>
+                              ))}
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <span className="text-[#8197a4] font-bold tracking-wide">{currentSeason?.episodes.length} Episodes</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -307,7 +361,7 @@ export default function MovieDetails() {
                 <div>
                   <h4 className="text-[#8197a4] font-bold mb-2">Starring</h4>
                   <p className="text-white/80">
-                    {movie.cast?.join(", ") || "Jitendra Kumar, Raghubir Yadav, Neena Gupta"}
+                    {movie.cast?.join(", ") || ""}
                   </p>
                 </div>
                 <div>
@@ -368,6 +422,6 @@ export default function MovieDetails() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }

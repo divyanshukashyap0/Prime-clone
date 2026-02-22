@@ -234,6 +234,7 @@ export default function AdminDashboard() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFetchingEpisodes, setIsFetchingEpisodes] = useState<number[]>([]);
     const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
+    const [adminSearchQuery, setAdminSearchQuery] = useState("");
 
     const [formData, setFormData] = useState<any>({
         title: "",
@@ -690,6 +691,15 @@ export default function AdminDashboard() {
         }
     };
 
+    const filteredContent = adminSearchQuery.trim() === ""
+        ? allContent
+        : allContent.filter(item =>
+            item.title.toLowerCase().includes(adminSearchQuery.toLowerCase()) ||
+            (item.genres && Array.isArray(item.genres) && item.genres.some((g: any) => g.toLowerCase().includes(adminSearchQuery.toLowerCase()))) ||
+            (item.category && item.category.toLowerCase().includes(adminSearchQuery.toLowerCase())) ||
+            (item.type && item.type.toLowerCase().includes(adminSearchQuery.toLowerCase()))
+        );
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -876,13 +886,42 @@ export default function AdminDashboard() {
                                     <h1 className="text-3xl font-bold">Content Library</h1>
                                     <p className="text-[#8197a4]">Total items: {allContent.length}</p>
                                 </div>
-                                <button
-                                    onClick={() => setActiveTab("add-content")}
-                                    className="bg-[#00a8e1] text-white px-6 py-2 rounded font-bold hover:bg-[#0092c3]"
-                                >
-                                    + New Title
-                                </button>
+                                <div className="flex flex-col md:flex-row gap-4 items-center">
+                                    <div className="relative w-full md:w-64">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8197a4]">
+                                            <Search size={18} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Search title, genre..."
+                                            value={adminSearchQuery}
+                                            onChange={(e) => setAdminSearchQuery(e.target.value)}
+                                            className="w-full bg-[#1b252f] border border-[#303c44] rounded-lg pl-10 pr-4 py-2 text-sm focus:border-[#00a8e1] outline-none transition-all"
+                                        />
+                                        {adminSearchQuery && (
+                                            <button
+                                                onClick={() => setAdminSearchQuery("")}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#8197a4] hover:text-white"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => setActiveTab("add-content")}
+                                        className="w-full md:w-auto bg-[#00a8e1] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0092c3] transition-all"
+                                    >
+                                        + New Title
+                                    </button>
+                                </div>
                             </div>
+
+                            <p className="text-[#8197a4] mb-6 text-sm">
+                                {adminSearchQuery.trim() !== ""
+                                    ? `Showing ${filteredContent.length} results for "${adminSearchQuery}"`
+                                    : `Total items: ${allContent.length}`
+                                }
+                            </p>
 
                             <div className="bg-[#1b252f] rounded-xl border border-[#303c44] overflow-hidden">
                                 <table className="w-full text-left">
@@ -897,7 +936,7 @@ export default function AdminDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#303c44]">
-                                        {allContent.map((item) => (
+                                        {filteredContent.map((item) => (
                                             <tr
                                                 key={item.id}
                                                 onClick={() => handleEdit(item)}
@@ -1186,7 +1225,7 @@ export default function AdminDashboard() {
                                             value={formData.youtubeId}
                                             onChange={(e) => setFormData({ ...formData, youtubeId: e.target.value })}
                                             className="w-full bg-[#0f171e] border border-[#303c44] rounded px-4 py-2 focus:border-primary outline-none"
-                                            placeholder="YouTube ID (e.g. dQw4w9WgXcQ) or link"
+                                            placeholder="YouTube ID or link"
                                         />
                                     </div>
                                     {formData.type !== "tv-show" && (

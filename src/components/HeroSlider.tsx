@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Movie } from "@/data/movies";
 
+import { loadYTApi } from "@/lib/youtube";
+
 interface HeroSliderProps {
   movies?: Movie[];
 }
@@ -13,23 +15,83 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
   const displayMovies = (propMovies && propMovies.length > 0) ? propMovies : [];
   const [current, setCurrent] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const total = displayMovies.length;
-
-  // Swipe/drag tracking
+  const playerRef = useRef<any>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const dragStartX = useRef<number | null>(null);
 
   useEffect(() => {
     setCurrent(0);
+    setIsVideoReady(false);
   }, [displayMovies]);
+
+  const initPlayer = useCallback(async (videoId: string) => {
+    if (!videoId) return;
+    await loadYTApi();
+    if (!playerContainerRef.current) return;
+
+    if (playerRef.current) {
+      try { playerRef.current.destroy(); } catch (e) { /* ignore */ }
+      playerRef.current = null;
+    }
+
+    const container = document.createElement('div');
+    playerContainerRef.current.innerHTML = '';
+    playerContainerRef.current.appendChild(container);
+
+    playerRef.current = new (window as any).YT.Player(container, {
+      width: '100%',
+      height: '100%',
+      videoId,
+      playerVars: {
+        autoplay: 1,
+        mute: 1,
+        controls: 0,
+        loop: 1,
+        playlist: videoId,
+        rel: 0,
+        modestbranding: 1,
+        iv_load_policy: 3,
+        disablekb: 1,
+        showinfo: 0,
+      },
+      events: {
+        onStateChange: (event: any) => {
+          if (event.data === (window as any).YT.PlayerState.PLAYING) {
+            setIsVideoReady(true);
+          }
+        },
+        onReady: (event: any) => {
+          event.target.mute();
+          event.target.playVideo();
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (displayMovies[current]?.youtubeId) {
+      initPlayer(displayMovies[current].youtubeId!);
+    }
+    return () => {
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch (e) { /* ignore */ }
+        playerRef.current = null;
+      }
+    };
+  }, [current, displayMovies, initPlayer]);
 
   const next = useCallback(() => {
     if (total === 0) return;
     setCurrent((c) => (c + 1) % total);
+    setIsVideoReady(false);
   }, [total]);
 
   const prev = useCallback(() => {
     if (total === 0) return;
     setCurrent((c) => (c - 1 + total) % total);
+    setIsVideoReady(false);
   }, [total]);
 
   useEffect(() => {
@@ -59,7 +121,7 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
 
   return (
     <section
-      className="relative w-full h-[75vh] md:h-[85vh] lg:h-[90vh] overflow-hidden bg-black select-none cursor-grab active:cursor-grabbing"
+      className="relative w-full h-[85vh] lg:h-screen overflow-hidden bg-black select-none cursor-grab active:cursor-grabbing"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerLeave={() => { dragStartX.current = null; }}
@@ -73,31 +135,29 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
           transition={{ duration: 1.2 }}
           className="absolute inset-0"
         >
+          {/* Backdrop Image (Always shown as background) */}
+          <img
+            src={movie.backdrop_path || movie.poster_path || "/logo.png"}
+            alt={movie.title}
+            className={`w-full h-full object-cover object-top md:object-center absolute inset-0 transition-opacity duration-1000 ${isVideoReady ? 'opacity-0' : 'opacity-100'}`}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = "/logo.png";
+              target.classList.add("opacity-10", "object-contain", "p-20");
+            }}
+          />
+
           {/* Background Video (Autoplay Muted Trailer) */}
-          {trailerId ? (
-            <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailerId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${trailerId}&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&showinfo=0`}
-                className="w-full h-full border-none opacity-60 scale-[1.3] origin-center"
-                allow="autoplay; encrypted-media"
-              />
+          {movie.youtubeId && (
+            <div className={`absolute inset-0 w-full h-full pointer-events-none overflow-hidden transition-opacity duration-1000 ${isVideoReady ? 'opacity-80' : 'opacity-0'}`}>
+              <div ref={playerContainerRef} className="w-full h-full border-none scale-[1.3] origin-center" />
             </div>
-          ) : (
-            <img
-              src={movie.backdrop_path || movie.poster_path || "/logo.png"}
-              alt={movie.title}
-              className="w-full h-full object-cover object-top md:object-center"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = "/logo.png";
-                target.classList.add("opacity-10", "object-contain", "p-20");
-              }}
-            />
           )}
 
           {/* Prime Style Gradients */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent w-full md:w-[70%]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0f171e] via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent w-full md:w-[60%]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0f171e] via-[#0f171e]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
         </motion.div>
       </AnimatePresence>
 
@@ -135,7 +195,7 @@ export default function HeroSlider({ movies: propMovies }: HeroSliderProps) {
             {/* Action Buttons */}
             <div className="flex items-center flex-wrap gap-3">
               <Link
-                to={`/movie/${movie.id}`}
+                to={`/movie/${movie.id}?autoplay=true`}
                 className="group flex flex-col justify-center bg-white border border-white hover:bg-[#00a8e1] hover:border-[#00a8e1] transition-all px-6 py-2.5 rounded min-w-[200px] shadow-2xl"
               >
                 <div className="flex items-center gap-2">

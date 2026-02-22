@@ -48,11 +48,13 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 flex items-start justify-between px-4 md:px-12 pt-5 pointer-events-none transition-all duration-700 h-[160px] ${scrolled
-        ? "bg-gradient-to-b from-[#0f171e] via-[#0f171e]/70 to-transparent"
-        : "bg-gradient-to-b from-black/80 via-black/20 to-transparent"
+      className={`fixed top-0 left-0 right-0 z-50 flex items-start justify-between px-4 md:px-12 pt-5 pointer-events-none transition-all duration-700 h-[130px] ${scrolled
+        ? "bg-[#0f171e]/95 backdrop-blur-md shadow-lg"
+        : "bg-gradient-to-b from-black/90 via-black/40 to-transparent"
         }`}
     >
+      {/* Gradient Bottom Edge */}
+      <div className={`absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent transition-opacity duration-500 ${scrolled ? 'opacity-100' : 'opacity-0'}`} />
       <div className="pointer-events-auto flex items-center gap-8">
         <Link to="/" className="flex items-center shrink-0">
           <img
