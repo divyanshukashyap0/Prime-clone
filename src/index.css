@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 9%;
+    /* #0f171e */
+    --foreground: 0 0% 100%;
+
+    --card: 210 27% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 210 27% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 195 100% 44%;
+    /* #00a8e1 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 27% 15%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 210 25% 20%;
+    --muted-foreground: 210 10% 65%;
+
+    --accent: 195 100% 44%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 25% 20%;
+    --input: 210 25% 20%;
+    --ring: 195 100% 44%;
+
+    --radius: 0.25rem;
+
+    --gradient-hero: linear-gradient(to right, #000000 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 100%);
+    --gradient-hero-v: linear-gradient(to top, #0f171e 0%, transparent 50%);
+    --gradient-nav: linear-gradient(to bottom, rgba(15, 23, 30, 0.95) 0%, rgba(15, 23, 30, 0.6) 70%, transparent 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[#0f171e] text-white;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-[#0f171e];
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[#33373d] rounded-full border-2 border-solid border-[#0f171e];
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-[#42474d];
+  }
+}
+
+@layer components {
+  .prime-glass {
+    @apply bg-[#0f171e]/80 backdrop-blur-md border border-white/5;
+  }
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.prime-button-main {
+  @apply bg-[#00a8e1] hover:bg-[#0092c3] text-white font-extrabold text-[15px] px-6 py-2.5 rounded transition-all active:scale-[0.98];
+}
+
+.prime-button-secondary {
+  @apply bg-[#ffffff1a] hover:bg-[#ffffff26] border border-[#ffffff33] text-white font-bold text-[15px] px-6 py-2.5 rounded transition-all backdrop-blur-sm;
+}
+
+/* Double-tap ripple for video player */
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  70% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.7s ease-out forwards;
+}
